@@ -2,5 +2,7 @@
   "name": "DivertFlow - Dynamic URL Redirection & Traffic Routing Platform",
   "description": "Real-time dynamic link management and traffic redirection platform. Change destination URLs anytime, manage ad campaign funnels, split test, and forward UTM parameters with 0 downtime.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

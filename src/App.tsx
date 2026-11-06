@@ -4,17 +4,13 @@ import {
   Search, 
   Plus, 
   RefreshCw, 
-  Filter, 
-  ExternalLink, 
-  Layers, 
-  Sparkles,
-  Zap,
-  Globe,
-  Shuffle,
+  AlertCircle,
+  ExternalLink,
   ShieldCheck,
-  AlertCircle
+  Zap,
+  Globe
 } from 'lucide-react';
-import { RedirectLink, ClickLogEntry } from './types/redirect';
+import { RedirectLink, ClickLogEntry, RequestContext } from './types/redirect';
 import { Navbar } from './components/Navbar';
 import { StatsOverview } from './components/StatsOverview';
 import { LinkCard } from './components/LinkCard';
@@ -25,6 +21,14 @@ import { FunnelVisualizer } from './components/FunnelVisualizer';
 import { RedirectSimulator } from './components/RedirectSimulator';
 import { ClickLogsTable } from './components/ClickLogsTable';
 import { AdPlatformGuide } from './components/AdPlatformGuide';
+import { 
+  getLocalLinks, 
+  setLocalLinks, 
+  getLocalLogs, 
+  addLocalLog, 
+  DEFAULT_LINKS 
+} from './utils/storage';
+import { resolveDestination, detectDevice } from './utils/routingEngine';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'links' | 'funnel' | 'simulator' | 'analytics' | 'guide'>('links');
@@ -52,23 +56,42 @@ export default function App() {
   // Dynamic Base URL
   const [baseUrl, setBaseUrl] = useState('');
 
+  // Client-side redirection state (for GitHub Pages static hosting where /r/:slug loads the SPA)
+  const [clientRedirectState, setClientRedirectState] = useState<{
+    isRedirecting: boolean;
+    slug: string;
+    destinationUrl: string;
+    countdown: number;
+  } | null>(null);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setBaseUrl(window.location.origin);
+      const origin = window.location.origin;
+      const pathname = window.location.pathname;
+      // If deployed on GitHub Pages subfolder like /repo-name/
+      const subpath = pathname.split('/r/')[0].replace(/\/$/, '');
+      setBaseUrl(`${origin}${subpath}`);
     }
   }, []);
 
-  // Fetch all links
+  // Fetch all links (Backend API with automatic localStorage fallback for GitHub Pages)
   const fetchLinks = useCallback(async () => {
     try {
       const res = await fetch('/api/links');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.links)) {
-        setLinks(data.links);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.links)) {
+          setLinks(data.links);
+          setLocalLinks(data.links);
+          return data.links;
+        }
       }
-    } catch (err: any) {
-      console.error('Error fetching links:', err);
-      setError('Failed loading routing links. Please check server connection.');
+      throw new Error('API not available, using local cache');
+    } catch {
+      // Fallback for static hosting like GitHub Pages
+      const local = getLocalLinks();
+      setLinks(local);
+      return local;
     }
   }, []);
 
@@ -76,12 +99,99 @@ export default function App() {
   const fetchLogs = useCallback(async () => {
     try {
       const res = await fetch('/api/logs');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.logs)) {
-        setLogs(data.logs);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.logs)) {
+          setLogs(data.logs);
+          return;
+        }
       }
-    } catch (err: any) {
-      console.error('Error fetching logs:', err);
+      throw new Error('API not available, using local cache');
+    } catch {
+      const local = getLocalLogs();
+      setLogs(local);
+    }
+  }, []);
+
+  // Check for Client-Side Redirect on mount (Handles GitHub Pages /r/:slug or ?r=:slug)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let targetSlug: string | null = null;
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.get('r')) {
+      targetSlug = searchParams.get('r');
+    } else if (path.includes('/r/')) {
+      const parts = path.split('/r/');
+      if (parts[1]) {
+        targetSlug = parts[1].split('/')[0].split('?')[0];
+      }
+    } else if (window.location.hash.includes('/r/')) {
+      const hashParts = window.location.hash.split('/r/');
+      if (hashParts[1]) {
+        targetSlug = hashParts[1].split('?')[0];
+      }
+    }
+
+    if (targetSlug) {
+      const currentLinks = getLocalLinks();
+      const matched = currentLinks.find((l) => l.slug.toLowerCase() === targetSlug!.toLowerCase());
+
+      if (matched) {
+        // Collect incoming query params
+        const incomingQuery: Record<string, string> = {};
+        searchParams.forEach((val, key) => {
+          if (key !== 'r') incomingQuery[key] = val;
+        });
+
+        const context: RequestContext = {
+          userAgent: navigator.userAgent,
+          device: detectDevice(navigator.userAgent),
+          queryParams: incomingQuery,
+          referrer: document.referrer || 'Direct / Ad click',
+        };
+
+        const result = resolveDestination(matched, context);
+
+        // Update local stats
+        matched.totalClicks = (matched.totalClicks || 0) + 1;
+        matched.lastClickedAt = new Date().toISOString();
+        const updated = currentLinks.map((l) => (l.id === matched.id ? matched : l));
+        setLocalLinks(updated);
+
+        // Log click
+        addLocalLog({
+          id: `log-${Date.now()}`,
+          linkId: matched.id,
+          slug: matched.slug,
+          timestamp: new Date().toISOString(),
+          ip: 'Client Browser',
+          country: 'Local',
+          device: context.device || 'desktop',
+          browser: 'Browser',
+          referrer: context.referrer || 'Direct',
+          incomingQuery,
+          destinationUrl: result.destinationUrl,
+          ruleMatched: result.matchedRuleName,
+          statusCode: result.statusCode,
+        });
+
+        setClientRedirectState({
+          isRedirecting: true,
+          slug: matched.slug,
+          destinationUrl: result.destinationUrl,
+          countdown: 1,
+        });
+
+        // Instant or 500ms redirect
+        const timer = setTimeout(() => {
+          window.location.replace(result.destinationUrl);
+        }, 500);
+
+        return () => clearTimeout(timer);
+      }
     }
   }, []);
 
@@ -93,119 +203,232 @@ export default function App() {
 
   // Handler: 1-Click Quick Divert Target URL
   const handleSaveQuickDivert = async (linkId: string, newUrl: string, reason: string) => {
-    const res = await fetch(`/api/links/${linkId}/quick-target`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newUrl, reason }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Failed to update URL');
+    try {
+      const res = await fetch(`/api/links/${linkId}/quick-target`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newUrl, reason }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.link) {
+          setLinks((prev) => {
+            const next = prev.map((l) => (l.id === linkId ? data.link : l));
+            setLocalLinks(next);
+            return next;
+          });
+          return;
+        }
+      }
+    } catch {
+      // Fallback for GitHub Pages static host
     }
-    // Update local state immediately
-    setLinks((prev) => prev.map((l) => (l.id === linkId ? data.link : l)));
+
+    // LocalStorage fallback update
+    setLinks((prev) => {
+      const next = prev.map((l) => {
+        if (l.id === linkId) {
+          const previousUrl = l.primaryUrl;
+          const history = l.urlHistory || [];
+          history.unshift({
+            timestamp: new Date().toISOString(),
+            previousUrl,
+            newUrl: newUrl.trim(),
+            note: reason,
+          });
+          const updated = {
+            ...l,
+            primaryUrl: newUrl.trim(),
+            urlHistory: history,
+            updatedAt: new Date().toISOString(),
+          };
+          if (updated.funnelHops) {
+            const finalHop = updated.funnelHops.find((h) => h.role === 'final_destination');
+            if (finalHop) finalHop.url = newUrl.trim();
+          }
+          return updated;
+        }
+        return l;
+      });
+      setLocalLinks(next);
+      return next;
+    });
   };
 
   // Handler: Save Full Link (Create or Update)
   const handleSaveLink = async (linkData: Partial<RedirectLink>) => {
+    try {
+      if (editLink) {
+        const res = await fetch(`/api/links/${editLink.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(linkData),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setLinks((prev) => {
+              const next = prev.map((l) => (l.id === editLink.id ? data.link : l));
+              setLocalLinks(next);
+              return next;
+            });
+            return;
+          }
+        }
+      } else {
+        const res = await fetch('/api/links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(linkData),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setLinks((prev) => {
+              const next = [data.link, ...prev];
+              setLocalLinks(next);
+              return next;
+            });
+            return;
+          }
+        }
+      }
+    } catch {
+      // Fallback for static host
+    }
+
+    // LocalStorage update
     if (editLink) {
-      // Update existing
-      const res = await fetch(`/api/links/${editLink.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(linkData),
+      setLinks((prev) => {
+        const next = prev.map((l) => (l.id === editLink.id ? { ...l, ...linkData, updatedAt: new Date().toISOString() } as RedirectLink : l));
+        setLocalLinks(next);
+        return next;
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update link');
-      }
-      setLinks((prev) => prev.map((l) => (l.id === editLink.id ? data.link : l)));
     } else {
-      // Create new
-      const res = await fetch('/api/links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(linkData),
+      const newLink: RedirectLink = {
+        id: `link-${Date.now()}`,
+        slug: (linkData.slug || `link-${Date.now()}`).toLowerCase(),
+        title: linkData.title || 'Dynamic Link',
+        primaryUrl: linkData.primaryUrl || 'https://example.com',
+        fallbackUrl: linkData.fallbackUrl || '',
+        status: linkData.status || 'active',
+        redirectType: linkData.redirectType || 302,
+        preserveQueryParams: linkData.preserveQueryParams !== undefined ? linkData.preserveQueryParams : true,
+        notes: linkData.notes || '',
+        tags: linkData.tags || ['Custom'],
+        enableRotator: !!linkData.enableRotator,
+        trafficSplits: linkData.trafficSplits || [],
+        conditionalRules: linkData.conditionalRules || [],
+        funnelHops: linkData.funnelHops || [
+          {
+            id: `h1-${Date.now()}`,
+            label: 'Ad Source',
+            role: 'ad_source',
+            url: 'Ad Network',
+          },
+          {
+            id: `h2-${Date.now()}`,
+            label: 'Tracking Link',
+            role: 'router',
+            url: `/r/${linkData.slug}`,
+          },
+          {
+            id: `h3-${Date.now()}`,
+            label: 'Target Destination',
+            role: 'final_destination',
+            url: linkData.primaryUrl || '',
+          },
+        ],
+        urlHistory: [
+          {
+            timestamp: new Date().toISOString(),
+            previousUrl: '',
+            newUrl: linkData.primaryUrl || '',
+            note: 'Initial URL configured',
+          },
+        ],
+        totalClicks: 0,
+        uniqueClicks: 0,
+        lastClickedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setLinks((prev) => {
+        const next = [newLink, ...prev];
+        setLocalLinks(next);
+        return next;
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to create link');
-      }
-      setLinks((prev) => [data.link, ...prev]);
     }
   };
 
   // Handler: Update link directly (from Funnel Visualizer)
   const handleDirectUpdateLink = async (updatedLink: RedirectLink) => {
-    const res = await fetch(`/api/links/${updatedLink.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedLink),
-    });
-    const data = await res.json();
-    if (data.success && data.link) {
-      setLinks((prev) => prev.map((l) => (l.id === updatedLink.id ? data.link : l)));
+    try {
+      fetch(`/api/links/${updatedLink.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedLink),
+      });
+    } catch {
+      // Ignored on static host
     }
+    setLinks((prev) => {
+      const next = prev.map((l) => (l.id === updatedLink.id ? updatedLink : l));
+      setLocalLinks(next);
+      return next;
+    });
   };
 
-  // Handler: Toggle Link Status (Active vs Paused)
+  // Handler: Toggle Link Status
   const handleToggleStatus = async (link: RedirectLink) => {
-    const newStatus = link.status === 'active' ? 'paused' : 'active';
+    const newStatus: 'active' | 'paused' = link.status === 'active' ? 'paused' : 'active';
     try {
-      const res = await fetch(`/api/links/${link.id}`, {
+      fetch(`/api/links/${link.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-      const data = await res.json();
-      if (data.success && data.link) {
-        setLinks((prev) => prev.map((l) => (l.id === link.id ? data.link : l)));
-      }
-    } catch (err) {
-      console.error('Failed toggling status:', err);
+    } catch {
+      // Ignored
     }
+    setLinks((prev) => {
+      const next = prev.map((l) => (l.id === link.id ? { ...l, status: newStatus } : l));
+      setLocalLinks(next);
+      return next;
+    });
   };
 
   // Handler: Delete Link
   const handleDeleteLink = async (linkId: string) => {
     try {
-      const res = await fetch(`/api/links/${linkId}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setLinks((prev) => prev.filter((l) => l.id !== linkId));
-      }
-    } catch (err) {
-      console.error('Failed deleting link:', err);
+      fetch(`/api/links/${linkId}`, { method: 'DELETE' });
+    } catch {
+      // Ignored
     }
+    setLinks((prev) => {
+      const next = prev.filter((l) => l.id !== linkId);
+      setLocalLinks(next);
+      return next;
+    });
   };
 
-  // Trigger quick divert modal
+  // Modals helpers
   const handleOpenQuickDivert = (link: RedirectLink) => {
     setQuickDivertLink(link);
     setIsQuickDivertOpen(true);
   };
-
-  // Trigger full edit modal
   const handleOpenEditModal = (link: RedirectLink) => {
     setEditLink(link);
     setIsEditModalOpen(true);
   };
-
-  // Trigger create modal
   const handleOpenCreateModal = () => {
     setEditLink(null);
     setIsEditModalOpen(true);
   };
-
-  // Trigger QR modal
   const handleOpenQrModal = (link: RedirectLink) => {
     setQrLink(link);
     setIsQrModalOpen(true);
   };
-
-  // Trigger simulator with specific link pre-filled
   const handleOpenSimulator = (link: RedirectLink) => {
     setSimulatorInitialLink(link);
     setActiveTab('simulator');
@@ -224,6 +447,33 @@ export default function App() {
     }
     return true;
   });
+
+  // If currently handling client-side redirect on GitHub Pages
+  if (clientRedirectState && clientRedirectState.isRedirecting) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+          <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mx-auto mb-4 animate-bounce">
+            <Zap className="w-6 h-6" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-1">Diverting Traffic...</h2>
+          <p className="text-xs text-slate-400 mb-4">
+            Campaign link <span className="text-cyan-300 font-mono">/r/{clientRedirectState.slug}</span> is redirecting you to:
+          </p>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-emerald-400 break-all mb-5">
+            {clientRedirectState.destinationUrl}
+          </div>
+          <a
+            href={clientRedirectState.destinationUrl}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-lg shadow-blue-500/20"
+          >
+            <span>Click here if not redirected automatically</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-slate-950 font-sans">
@@ -261,7 +511,6 @@ export default function App() {
           <div className="space-y-4">
             {/* Action & Filter Bar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
-              {/* Search input */}
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                 <input

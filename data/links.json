@@ -1,5 +1,58 @@
 [
   {
+    "id": "link-1793940885479",
+    "slug": "superprofilelink",
+    "title": "test",
+    "primaryUrl": "https://mail.google.com/",
+    "fallbackUrl": "https://www.google.com/",
+    "status": "active",
+    "redirectType": 302,
+    "preserveQueryParams": true,
+    "notes": "",
+    "tags": [
+      "Custom"
+    ],
+    "enableRotator": false,
+    "trafficSplits": [],
+    "conditionalRules": [],
+    "funnelHops": [
+      {
+        "id": "hop-1793940885479-1",
+        "label": "Ad Source / Traffic Entry",
+        "role": "ad_source",
+        "url": "Ad Network / Creative",
+        "description": "Where users click the link"
+      },
+      {
+        "id": "hop-1793940885479-2",
+        "label": "Tracking Link",
+        "role": "router",
+        "url": "/r/superprofilelink",
+        "description": "DivertFlow dynamic router"
+      },
+      {
+        "id": "hop-1793940885479-3",
+        "label": "Target Destination",
+        "role": "final_destination",
+        "url": "https://mail.google.com/",
+        "description": "Destination users are sent to"
+      }
+    ],
+    "urlHistory": [
+      {
+        "timestamp": "2026-11-06T04:54:45.479Z",
+        "previousUrl": "",
+        "newUrl": "https://mail.google.com/",
+        "note": "Initial URL configured"
+      }
+    ],
+    "totalClicks": 0,
+    "uniqueClicks": 0,
+    "lastClickedAt": null,
+    "createdAt": "2026-11-06T04:54:45.479Z",
+    "updatedAt": "2026-11-06T04:54:45.479Z"
+  },
+  {
     "id": "link-campaign-1",
     "slug": "ad-summer-promo",
     "title": "Ad Campaign Traffic Router (abc -> bca -> cab)",
