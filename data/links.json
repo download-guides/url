@@ -1,0 +1,206 @@
+[
+  {
+    "id": "link-campaign-1",
+    "slug": "ad-summer-promo",
+    "title": "Ad Campaign Traffic Router (abc -> bca -> cab)",
+    "primaryUrl": "https://example-cab.com/summer-special",
+    "fallbackUrl": "https://example-bca.com/main-landing",
+    "status": "active",
+    "redirectType": 302,
+    "preserveQueryParams": true,
+    "notes": "Live ad campaign running on Google/Meta. Traffic currently diverted to new cab.com launch page.",
+    "tags": [
+      "Google Ads",
+      "Funnel",
+      "Hot Offer"
+    ],
+    "enableRotator": false,
+    "trafficSplits": [],
+    "conditionalRules": [
+      {
+        "id": "rule-mobile",
+        "name": "Mobile Special Offer",
+        "type": "device",
+        "operator": "equals",
+        "value": "mobile",
+        "targetUrl": "https://example-cab.com/mobile-checkout",
+        "active": false
+      }
+    ],
+    "funnelHops": [
+      {
+        "id": "hop-1",
+        "label": "Ad Platform (Traffic Source)",
+        "role": "ad_source",
+        "url": "https://ads.abc.com/campaign/promo-2026",
+        "description": "Google Ads & Meta Ads campaign displaying banner ads"
+      },
+      {
+        "id": "hop-2",
+        "label": "DivertFlow Tracking Link",
+        "role": "router",
+        "url": "/r/ad-summer-promo",
+        "description": "Central dynamic router link placed inside ad creative"
+      },
+      {
+        "id": "hop-3",
+        "label": "Previous Pre-lander (Bridge)",
+        "role": "intermediate_bridge",
+        "url": "https://example-bca.com/review-article",
+        "description": "Original intermediate content / review article page"
+      },
+      {
+        "id": "hop-4",
+        "label": "Current Live Destination",
+        "role": "final_destination",
+        "url": "https://example-cab.com/summer-special",
+        "description": "Diverted direct conversion & checkout destination"
+      }
+    ],
+    "urlHistory": [
+      {
+        "timestamp": "2026-11-03T04:35:53.759Z",
+        "previousUrl": "https://example-bca.com/initial-test",
+        "newUrl": "https://example-bca.com/review-article",
+        "note": "Switched to bridge pre-lander"
+      },
+      {
+        "timestamp": "2026-11-05T04:35:53.760Z",
+        "previousUrl": "https://example-bca.com/review-article",
+        "newUrl": "https://example-cab.com/summer-special",
+        "note": "Diverted direct to high-converting cab.com offer"
+      }
+    ],
+    "totalClicks": 1421,
+    "uniqueClicks": 1184,
+    "lastClickedAt": "2026-11-06T04:37:00.735Z",
+    "createdAt": "2026-10-30T04:35:53.760Z",
+    "updatedAt": "2026-11-05T04:35:53.760Z"
+  },
+  {
+    "id": "link-campaign-2",
+    "slug": "ecommerce-split",
+    "title": "50/50 A/B Rotator (Checkout V1 vs V2)",
+    "primaryUrl": "https://shop.example.com/checkout-v1",
+    "fallbackUrl": "https://shop.example.com/home",
+    "status": "active",
+    "redirectType": 302,
+    "preserveQueryParams": true,
+    "notes": "Split test to determine which checkout converts higher before scaling ads budget.",
+    "tags": [
+      "A/B Testing",
+      "E-Commerce"
+    ],
+    "enableRotator": true,
+    "trafficSplits": [
+      {
+        "id": "split-1",
+        "name": "Variant A (1-Page Checkout)",
+        "url": "https://shop.example.com/checkout-v1",
+        "weight": 50
+      },
+      {
+        "id": "split-2",
+        "name": "Variant B (Express Pay Modal)",
+        "url": "https://shop.example.com/checkout-v2",
+        "weight": 50
+      }
+    ],
+    "conditionalRules": [],
+    "funnelHops": [
+      {
+        "id": "hop-2-1",
+        "label": "Facebook Ads",
+        "role": "ad_source",
+        "url": "https://facebook.com/ads/manager",
+        "description": "Dynamic Product Ads targeting cart abandoners"
+      },
+      {
+        "id": "hop-2-2",
+        "label": "Dynamic Rotator",
+        "role": "router",
+        "url": "/r/ecommerce-split",
+        "description": "Distributes traffic evenly between checkout versions"
+      },
+      {
+        "id": "hop-2-3",
+        "label": "Checkout Split Variants",
+        "role": "final_destination",
+        "url": "https://shop.example.com/checkout-v1 | v2",
+        "description": "Tracking conversion rates per variant"
+      }
+    ],
+    "urlHistory": [],
+    "totalClicks": 840,
+    "uniqueClicks": 760,
+    "lastClickedAt": "2026-11-06T03:50:53.760Z",
+    "createdAt": "2026-11-02T04:35:53.760Z",
+    "updatedAt": "2026-11-04T04:35:53.760Z"
+  },
+  {
+    "id": "link-campaign-3",
+    "slug": "mobile-app-download",
+    "title": "Smart Device Router (iOS vs Android Store)",
+    "primaryUrl": "https://mybrand.com/app-web-overview",
+    "fallbackUrl": "https://mybrand.com/app-web-overview",
+    "status": "active",
+    "redirectType": 302,
+    "preserveQueryParams": true,
+    "notes": "One single QR code / bio link that opens Apple App Store on iPhones and Google Play on Android.",
+    "tags": [
+      "Smart Device",
+      "App Install"
+    ],
+    "enableRotator": false,
+    "trafficSplits": [],
+    "conditionalRules": [
+      {
+        "id": "rule-ios",
+        "name": "Apple App Store",
+        "type": "device",
+        "operator": "equals",
+        "value": "mobile",
+        "targetUrl": "https://apps.apple.com/app/my-awesome-app/id123456789",
+        "active": true
+      },
+      {
+        "id": "rule-tablet",
+        "name": "iPad / Tablet Experience",
+        "type": "device",
+        "operator": "equals",
+        "value": "tablet",
+        "targetUrl": "https://apps.apple.com/app/my-awesome-app/id123456789",
+        "active": true
+      }
+    ],
+    "funnelHops": [
+      {
+        "id": "hop-3-1",
+        "label": "Instagram Bio & QR Stickers",
+        "role": "ad_source",
+        "url": "https://instagram.com/mybrand",
+        "description": "Organic profile & printed event posters"
+      },
+      {
+        "id": "hop-3-2",
+        "label": "Smart Device Redirector",
+        "role": "router",
+        "url": "/r/mobile-app-download",
+        "description": "Inspects user-agent and sends to device store"
+      },
+      {
+        "id": "hop-3-3",
+        "label": "Native App Store Listing",
+        "role": "final_destination",
+        "url": "https://apps.apple.com or https://play.google.com",
+        "description": "Direct 1-tap app install"
+      }
+    ],
+    "urlHistory": [],
+    "totalClicks": 2150,
+    "uniqueClicks": 1980,
+    "lastClickedAt": "2026-11-06T04:30:53.760Z",
+    "createdAt": "2026-10-27T04:35:53.760Z",
+    "updatedAt": "2026-11-03T04:35:53.760Z"
+  }
+]

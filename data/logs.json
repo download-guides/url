@@ -1,0 +1,92 @@
+[
+  {
+    "id": "log-1793939820735-jpu06",
+    "linkId": "link-campaign-1",
+    "slug": "ad-summer-promo",
+    "timestamp": "2026-11-06T04:37:00.735Z",
+    "ip": "127.0.0.1",
+    "country": "IN",
+    "device": "other",
+    "browser": "Browser",
+    "referrer": "Direct / Ad Click",
+    "incomingQuery": {
+      "utm_source": "user_test_click",
+      "fbclid": "abc12345"
+    },
+    "destinationUrl": "https://example-cab.com/summer-special?utm_source=user_test_click&fbclid=abc12345",
+    "ruleMatched": "Primary Destination",
+    "statusCode": 302
+  },
+  {
+    "id": "log-1",
+    "linkId": "link-campaign-1",
+    "slug": "ad-summer-promo",
+    "timestamp": "2026-11-06T04:23:53.760Z",
+    "ip": "49.36.128.4",
+    "country": "IN",
+    "device": "mobile",
+    "browser": "Chrome Mobile",
+    "referrer": "https://www.google.com/search?q=deals",
+    "incomingQuery": {
+      "utm_source": "google_ads",
+      "utm_campaign": "summer_promo",
+      "gclid": "EAIaIQobChMI..."
+    },
+    "destinationUrl": "https://example-cab.com/summer-special?utm_source=google_ads&utm_campaign=summer_promo&gclid=EAIaIQobChMI...",
+    "ruleMatched": "Primary Destination (Diverted to cab.com)",
+    "statusCode": 302
+  },
+  {
+    "id": "log-2",
+    "linkId": "link-campaign-1",
+    "slug": "ad-summer-promo",
+    "timestamp": "2026-11-06T04:10:53.760Z",
+    "ip": "103.21.124.9",
+    "country": "IN",
+    "device": "desktop",
+    "browser": "Chrome 122",
+    "referrer": "https://www.facebook.com/",
+    "incomingQuery": {
+      "utm_source": "meta_ads",
+      "fbclid": "IwAR2k..."
+    },
+    "destinationUrl": "https://example-cab.com/summer-special?utm_source=meta_ads&fbclid=IwAR2k...",
+    "ruleMatched": "Primary Destination",
+    "statusCode": 302
+  },
+  {
+    "id": "log-3",
+    "linkId": "link-campaign-2",
+    "slug": "ecommerce-split",
+    "timestamp": "2026-11-06T03:50:53.760Z",
+    "ip": "172.56.21.90",
+    "country": "US",
+    "device": "mobile",
+    "browser": "Safari",
+    "referrer": "https://instagram.com/",
+    "incomingQuery": {
+      "utm_source": "ig_reels",
+      "utm_medium": "paid_ad"
+    },
+    "destinationUrl": "https://shop.example.com/checkout-v2?utm_source=ig_reels&utm_medium=paid_ad",
+    "ruleMatched": "Split: Variant B (Express Pay Modal) (50%)",
+    "statusCode": 302
+  },
+  {
+    "id": "log-4",
+    "linkId": "link-campaign-3",
+    "slug": "mobile-app-download",
+    "timestamp": "2026-11-06T04:30:53.760Z",
+    "ip": "198.51.100.42",
+    "country": "US",
+    "device": "mobile",
+    "browser": "Mobile Safari",
+    "referrer": "https://instagram.com/stories",
+    "incomingQuery": {
+      "ref": "qr_sticker_mumbai"
+    },
+    "destinationUrl": "https://apps.apple.com/app/my-awesome-app/id123456789?ref=qr_sticker_mumbai",
+    "ruleMatched": "Rule: Apple App Store",
+    "statusCode": 302
+  }
+]
