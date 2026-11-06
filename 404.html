@@ -1,18 +1,198 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DivertFlow - Dynamic URL Redirection & Traffic Routing Platform</title>
-    <meta name="description" content="Real-time dynamic link management and traffic redirection platform. Change destination URLs anytime, manage ad campaign funnels, split test, and forward UTM parameters with 0 downtime." />
-    <meta property="og:title" content="DivertFlow - Dynamic URL Redirection & Traffic Routing Platform" />
-    <meta property="og:description" content="Real-time dynamic link management and traffic redirection platform. Change destination URLs anytime, manage ad campaign funnels, split test, and forward UTM parameters with 0 downtime." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <script type="module" crossorigin src="./assets/app.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/app.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <title>Diverting Traffic | DivertFlow</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 32px 24px; max-width: 480px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+    .spinner { width: 44px; height: 44px; border: 4px solid #334155; border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h2 { font-size: 20px; font-weight: 700; margin: 0 0 8px; color: #f1f5f9; }
+    p { color: #94a3b8; font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+    .dest { background: #0f172a; color: #34d399; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; padding: 12px 14px; border-radius: 8px; word-break: break-all; margin-bottom: 20px; border: 1px solid #334155; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 8px; transition: background 0.2s; }
+    .btn:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="spinner" class="spinner"></div>
+    <h2 id="heading">Diverting Traffic...</h2>
+    <p id="msg">Evaluating campaign rules and forwarding to destination...</p>
+    <div id="destBox" class="dest" style="display:none;"></div>
+    <div id="actionArea">
+      <a id="fallbackLink" class="btn" href="#" style="display:none;">Proceed to Destination</a>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      var path = window.location.pathname;
+      var search = window.location.search;
+
+      // Extract repo base if on github.io (e.g. /url)
+      var repoBase = '';
+      if (window.location.hostname.indexOf('github.io') !== -1) {
+        var segs = path.split('/');
+        if (segs[1]) repoBase = '/' + segs[1];
+      }
+
+      // Check if URL is a tracking link: /r/:slug or ?r=:slug
+      var targetSlug = null;
+      if (path.indexOf('/r/') !== -1) {
+        var parts = path.split('/r/');
+        if (parts[1]) {
+          targetSlug = parts[1].split('/')[0].split('?')[0].split('#')[0];
+        }
+      } else if (search.indexOf('r=') !== -1) {
+        var params = new URLSearchParams(search);
+        targetSlug = params.get('r');
+      }
+
+      // If NOT an /r/ link, redirect to main dashboard
+      if (!targetSlug) {
+        window.location.replace(repoBase + '/');
+        return;
+      }
+
+      // Read links from localStorage
+      var links = [];
+      try {
+        var raw = localStorage.getItem('divertflow_links_v1');
+        if (raw) links = JSON.parse(raw);
+      } catch (e) {}
+
+      // Default fallback links if localStorage empty
+      if (!links || links.length === 0) {
+        links = [
+          {
+            slug: 'ad-summer-promo',
+            primaryUrl: 'https://example-cab.com/summer-special',
+            status: 'active',
+            preserveQueryParams: true
+          },
+          {
+            slug: 'ecommerce-split',
+            primaryUrl: 'https://shop.example.com/checkout-v1',
+            status: 'active',
+            preserveQueryParams: true
+          },
+          {
+            slug: 'mobile-app-download',
+            primaryUrl: 'https://mybrand.com/app-web-overview',
+            status: 'active',
+            preserveQueryParams: true
+          }
+        ];
+      }
+
+      var cleanSlug = targetSlug.toLowerCase().trim();
+      var matched = null;
+      for (var i = 0; i < links.length; i++) {
+        if (links[i].slug && links[i].slug.toLowerCase().trim() === cleanSlug) {
+          matched = links[i];
+          break;
+        }
+      }
+
+      // Check for encoded param (?d=...)
+      var encodedParam = null;
+      if (search.indexOf('d=') !== -1) {
+        try {
+          var p = new URLSearchParams(search).get('d');
+          if (p) encodedParam = decodeURIComponent(escape(atob(p)));
+        } catch(e) {}
+      }
+
+      if (matched || encodedParam) {
+        // Paused check
+        if (matched && matched.status === 'paused') {
+          if (matched.fallbackUrl && matched.fallbackUrl.trim()) {
+            window.location.replace(matched.fallbackUrl.trim());
+            return;
+          }
+          document.getElementById('spinner').style.display = 'none';
+          document.getElementById('heading').textContent = 'Campaign Paused';
+          document.getElementById('msg').textContent = 'This ad campaign link has been temporarily paused by the advertiser.';
+          return;
+        }
+
+        var targetUrl = encodedParam || (matched ? matched.primaryUrl : 'https://example.com');
+
+        // Smart device check (Mobile override)
+        if (matched && matched.conditionalRules && matched.conditionalRules.length > 0) {
+          var ua = navigator.userAgent.toLowerCase();
+          var isMobile = /iphone|ipad|ipod|android|mobile/i.test(ua);
+          for (var r = 0; r < matched.conditionalRules.length; r++) {
+            var rule = matched.conditionalRules[r];
+            if (rule.active && rule.type === 'device' && rule.value === 'mobile' && isMobile && rule.targetUrl) {
+              targetUrl = rule.targetUrl;
+              break;
+            }
+          }
+        }
+
+        // Forward UTM and query params losslessly
+        if ((!matched || matched.preserveQueryParams !== false) && search) {
+          var searchParams = new URLSearchParams(search);
+          try {
+            var parsed = new URL(targetUrl);
+            searchParams.forEach(function(val, key) {
+              if (key !== 'r' && key !== 'd') parsed.searchParams.set(key, val);
+            });
+            targetUrl = parsed.toString();
+          } catch(e) {
+            targetUrl += (targetUrl.indexOf('?') === -1 ? '?' : '&') + search.substring(1);
+          }
+        }
+
+        // Update click stats in localStorage
+        if (matched) {
+          try {
+            matched.totalClicks = (matched.totalClicks || 0) + 1;
+            matched.lastClickedAt = new Date().toISOString();
+            localStorage.setItem('divertflow_links_v1', JSON.stringify(links));
+
+            var logsRaw = localStorage.getItem('divertflow_logs_v1');
+            var logs = logsRaw ? JSON.parse(logsRaw) : [];
+            logs.unshift({
+              id: 'log-' + Date.now(),
+              linkId: matched.id || cleanSlug,
+              slug: matched.slug,
+              timestamp: new Date().toISOString(),
+              ip: 'Direct Visitor',
+              country: 'Global',
+              device: /mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+              destinationUrl: targetUrl,
+              statusCode: 302
+            });
+            localStorage.setItem('divertflow_logs_v1', JSON.stringify(logs.slice(0, 300)));
+          } catch(e) {}
+        }
+
+        // Show destination preview in case browser delays
+        var destBox = document.getElementById('destBox');
+        var fallbackLink = document.getElementById('fallbackLink');
+        if (destBox) {
+          destBox.textContent = targetUrl;
+          destBox.style.display = 'block';
+        }
+        if (fallbackLink) {
+          fallbackLink.href = targetUrl;
+          fallbackLink.style.display = 'inline-block';
+        }
+
+        // Instant redirect
+        window.location.replace(targetUrl);
+      } else {
+        // Link not found
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('heading').textContent = 'Link Not Found';
+        document.getElementById('msg').innerHTML = 'The dynamic link <code>/r/' + targetSlug + '</code> is not recognized or was created on another device.<br><br><a class="btn" href="' + repoBase + '/">Open DivertFlow Dashboard</a>';
+      }
+    })();
+  </script>
+</body>
 </html>
